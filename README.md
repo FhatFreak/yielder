@@ -10,13 +10,14 @@ This is where we will do chemistry stuff!
 * list item
 Code is wrapped in `backticks` like so.  Or indented 4 spaces
 
-    this is a block code
-	this as;dflkjas ;dflkasjdf asdf
-	System.out.println("hello")
-	
+
+	System.out.println('hi')
+
+
 > test quote
 
 asdf;asdfas
 
 asdfasdf
 asdf
+asdfasdfasdf
