@@ -11,21 +11,22 @@ function toSvgPoint(svg, x, y) {
 const mouseDowns = Kefir.fromEvents(mainSVG, 'mousedown');
 const mouseMoves = Kefir.fromEvents(document, 'mousemove');
 const mouseUps = Kefir.fromEvents(document, 'mouseup');
-const touchStarts = Kefir.fromEvents(mainSVG, 'touchstart');
-const touchMoves = Kefir.fromEvents(document, 'touchmove');
-const touchEnds = Kefir.fromEvents(document, 'touchend');
-const touchCancels = Kefir.fromEvents(document, 'touchcancel');
 
 const mouseDrags = mouseDowns.map(downEvent => mouseMoves
     .toProperty(_ => downEvent)
     .takeUntilBy(mouseUps)
     .map(event => toSvgPoint(mainSVG, event.clientX, event.clientY)));
 
-const multiTouchStarts = touchStarts.filter(event => event.touches.length > 1);
-const touchDragStops = Kefir.merge([touchEnds, touchCancels, multiTouchStarts])
+const touchStarts = Kefir.fromEvents(mainSVG, 'touchstart');
+const touchMoves = Kefir.fromEvents(mainSVG, 'touchmove');
+const touchEnds = Kefir.fromEvents(mainSVG, 'touchend');
+const touchCancels = Kefir.fromEvents(mainSVG, 'touchcancel');
 
-const touchDrags = touchStarts
-    .filter(event => event.touches.length === 1)
+const singleTouchStarts = touchStarts.filter(event => event.touches.length == 1);
+const multiTouchStarts = touchStarts.filter(event => event.touches.length > 1);
+const touchDragStops = Kefir.merge([touchEnds, touchCancels, multiTouchStarts]);
+
+const touchDrags = singleTouchStarts
     .onValue(event => event.preventDefault())
     .map(startEvent => touchMoves
         .toProperty(_ => startEvent)
