@@ -1,11 +1,21 @@
 const svgns = 'http://www.w3.org/2000/svg';
 const mainSVG = document.getElementById('main');
 
-const toSvgPoint = (svg, {x,y}) => {
+const distance = ({x:x1, y:y1}, {x:x2, y:y2}) => Math.sqrt((x1 - x2)**2 + (y1 - y2)**2);
+
+const toSvgPoint = (svg, {x, y}) => {
     const p = svg.createSVGPoint();
     p.x = x;
     p.y = y;
     return p.matrixTransform(svg.getScreenCTM().inverse());
+};
+
+const pathRadiusBuffer = (path, radius=10) => {
+    const outsideRadius = Kefir.combine([path.take(1), path.skip(1)], distance)
+        .filter(dist => dist >= radius);
+    const insideChunk = path.bufferBy(outsideRadius, {flushOnEnd:false}).take(1);
+    const outside = path.skipUntilBy(insideChunk);
+    return Kefir.concat([insideChunk.flatten(), outside]);
 };
 
 const mouseDowns = Kefir.fromEvents(mainSVG, 'mousedown');
@@ -24,31 +34,19 @@ const touchCancels = Kefir.fromEvents(mainSVG, 'touchcancel');
 
 const singleTouchStarts = touchStarts.filter(touchStart => touchStart.touches.length == 1);
 const multiTouchStarts = touchStarts.filter(touchStart => touchStart.touches.length > 1);
-const touchDrawPathstops = Kefir.merge([touchEnds, touchCancels, multiTouchStarts]);
+const touchDrawPathStops = Kefir.merge([touchEnds, touchCancels, multiTouchStarts]);
 
-const touchDrawPaths = singleTouchStarts.map(touchStart => {
-    const {touches:[ {clientX:x0, clientY:y0} ]} = touchStart;
-    const path = touchMoves
-        .takeUntilBy(touchDrawPathstops)
+const touchDrawPaths = singleTouchStarts
+    .map(touchStart => touchMoves
+        .takeUntilBy(touchDrawPathStops)
         .toProperty(_ => touchStart)
         .onValue(event => event.preventDefault())
-        .map(( {touches:[ {clientX:x, clientY:y} ]} ) => ( {x, y} ));
+        .map(( {touches:[ {clientX:x, clientY:y} ]} ) => ( {x, y} )))
+    .map(pathRadiusBuffer);
 
-    const radius = 10;
-    const outsideRadius = path
-        .filter(( {x, y} ) => Math.sqrt((x - x0)**2 + (y - y0)**2) >= radius)
-        .take(1);
-
-    return path
-        .bufferBy(outsideRadius, {flushOnEnd:false})
-        .flatten()
-        .concat(path.skipUntilBy(outsideRadius));
-});
-
-const drawPaths = Kefir.merge([touchDrawPaths, mouseDrawPaths])
-    .map(path => path
-        .skipDuplicates(( {x:x1, y:y1}, {x:x2, y:y2} ) => x1 === x2 && y1 === y2)
-        .map(point => toSvgPoint(mainSVG, point)));
+const drawPaths = Kefir.merge([touchDrawPaths, mouseDrawPaths]).map(path => path
+    .skipDuplicates(( {x:x1, y:y1}, {x:x2, y:y2} ) => x1 === x2 && y1 === y2)
+    .map(point => toSvgPoint(mainSVG, point)));
 
 drawPaths.onValue(path => path
     .slidingWindow(2, 2)
